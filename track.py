@@ -6,6 +6,9 @@ import json
 class Track(object):
     def __init__(self, n_line, ip_list):
         self.car_matrix = [[[] for j in range(len(ip_list))] for i in range(n_line)]
+        self.no_view_matrix = [[[] for j in range(len(ip_list))] for i in range(n_line)]
+        self.last_cleaned_packages = None
+
         self.lane_cars = [0, 0, 0]
         # print(self.car_matrix)
         self.first_package, self.time_stamp = self.get_first_package(ip_list)
@@ -43,6 +46,7 @@ class Track(object):
     def init_car_matrix(self):
         packages = self.first_package
         cleaned_packages = self.clean(packages)
+        self.last_cleaned_packages = cleaned_packages
 
         for i in range(len(cleaned_packages)-1, -1, -1):
             for j in range(len(cleaned_packages[i])-1, -1, -1):
@@ -96,16 +100,53 @@ class Track(object):
     def track_car(self, interval_package):
         packages = [{} for i in ip_list]
         for i in range(len(ip_list)):
-            packages[i] = interval_package[ip_list[i]]
+            if interval_package.get(ip_list[i], None):
+                packages[i] = interval_package[ip_list[i]]
 
         cleaned_packages = self.clean(packages)
-        print(len(interval_package))
-        # TODO 需要新增吗?
-            # 从哪儿新增
-                # 同车道
-                # 隔壁车道
-                # 盲区
-        # TODO 需要删除吗?
+
+        is_add_result = self.is_add(self.last_cleaned_packages, cleaned_packages)
+
+        self.lane_add_car(is_add_result)
+
+
+    def is_add(self, last_cleaned_packages, cleaned_packages):
+        is_add_result = [[0 for j in range(len(ip_list))] for i in range(n_line)]
+        for i in range(len(cleaned_packages)):
+
+            tmp = [{},{},{},10000.0,10000.0,10000.0]
+
+            for car in last_cleaned_packages[i]:
+                tmp[car["lane"]-1][car["obj_id"]] = car["y"]
+                if float(car["y"]) < tmp[car["lane"]-1+3]:
+                    tmp[car["lane"] - 1 + 3] = float(car["y"])
+
+            for car in cleaned_packages[i]:
+                if float(car["y"]) < tmp[car["lane"]-1+3] or car["obj_id"] not in tmp[car["lane"]-1]:
+                    is_add_result[car["lane"]-1][i] += 1
+
+        self.last_cleaned_packages = cleaned_packages
+
+        return is_add_result
+
+
+    def lane_add_car(self, param):
+        # 从哪儿新增
+            # 同车道
+            # 盲区
+        for radar in range(len(param[0])):
+            for lane in range(len(param)):
+                print(param[lane][radar])
+                for car in range(param[lane][radar]):
+                    if self.no_view_matrix[lane][radar]:
+                        self.car_matrix[lane][radar].insert(0, self.no_view_matrix[lane][radar].pop(-1))
+                    else:
+                        self.car_matrix[lane][radar].insert(0, str(lane+1) + "-" + str(self.lane_cars[lane]))
+                        self.lane_cars[lane] += 1
+
+                # 车辆进入盲区
+
+
 
 
 if __name__ == "__main__":
@@ -117,3 +158,4 @@ if __name__ == "__main__":
     # 实现类
     trace = Track(n_line, ip_list)
     trace.process()
+    print("Done")
