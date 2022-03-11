@@ -26,7 +26,7 @@ class Track(object):
         ip_index_dict = {ip_list[i]: i for i in range(len(ip_list))}  # {165:0, 166:1, 168:2 ...}
         full_flag = False
 
-        with open("data113.txt", "r") as f:
+        with open("20220311_48.txt", "r") as f:
             for line in f.readlines():
                 data = json.loads(line)
 
@@ -38,7 +38,7 @@ class Track(object):
                 first_package_set.add(data["ip"])
 
                 if len(first_package_set) == len(ip_list):
-                    time_stamp = data["time_stamp"]
+                    time_stamp = int(data["time_stamp"])
                     full_flag = True
 
         return first_package, time_stamp
@@ -78,6 +78,15 @@ class Track(object):
                     end = i
                     break
 
+            # 过滤数据中车道为4的车辆
+            pop_list = []
+            for i in range(len(tmp)):
+                if tmp[i]["lane"] == 4:
+                    pop_list.insert(0, i)
+
+            for i in pop_list:
+                tmp.pop(i)
+
             cleaned_package.append(tmp[:end])
         return cleaned_package
 
@@ -85,10 +94,12 @@ class Track(object):
         time_stamp = self.time_stamp
         interval_package_dict = {}
 
-        with open("data113.txt", "r") as f:
+        with open("20220311_48.txt", "r") as f:
             for line in f.readlines():
 
                 data = json.loads(line)
+
+                data["time_stamp"] = int(data["time_stamp"])
 
                 if data["time_stamp"] > time_stamp:
                     time_stamp = data["time_stamp"]
@@ -109,12 +120,11 @@ class Track(object):
 
         self.lane_add_car(is_add_result)
 
-
     def is_add(self, last_cleaned_packages, cleaned_packages):
         is_add_result = [[0 for j in range(len(ip_list))] for i in range(n_line)]
         for i in range(len(cleaned_packages)):
 
-            tmp = [{},{},{},10000.0,10000.0,10000.0]
+            tmp = [{}, {}, {}, 10000.0, 10000.0, 10000.0]
 
             for car in last_cleaned_packages[i]:
                 tmp[car["lane"]-1][car["obj_id"]] = car["y"]
@@ -128,7 +138,6 @@ class Track(object):
         self.last_cleaned_packages = cleaned_packages
 
         return is_add_result
-
 
     def lane_add_car(self, param):
         # 从哪儿新增
@@ -145,14 +154,25 @@ class Track(object):
                         self.lane_cars[lane] += 1
 
                 # 车辆进入盲区
+                num_car_into_nonview = len(self.car_matrix[lane][radar])
+                for car in self.last_cleaned_packages[radar]:
+                    if car["lane"]-1 == lane:
+                        num_car_into_nonview -= 1
 
+                for i in range(num_car_into_nonview):
+                    if radar < len(ip_list) - 1:
+                        self.no_view_matrix[lane][radar+1].append(self.car_matrix[lane][radar].pop(-1))
+                    else:
+                        self.car_matrix[lane][radar].pop(-1)
 
+                # print(self.last_cleaned_packages)
+                # print(self.car_matrix)
 
 
 if __name__ == "__main__":
     # 启动配置
-    ip_list = ['44.49.76.165', '44.49.76.166', '44.49.76.168', '44.49.76.169', '44.49.76.170', '44.49.76.171',
-               '44.49.76.172', '44.49.76.173', '44.49.76.174']
+    ip_list = ['44.49.76.165', '44.49.76.166', '44.49.76.167', '44.49.76.168', '44.49.76.169', '44.49.76.170',
+               '44.49.76.171', '44.49.76.172', '44.49.76.173', '44.49.76.174']
     n_line = 3
 
     # 实现类
