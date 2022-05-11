@@ -5,14 +5,12 @@ import json
 import threading
 
 # 实例化 track_mq 对象
-from track_mq import Track
+from track_mq_nochange import Track
 # 启动配置
-ip_list = ['44.49.76.165', '44.49.76.166', '44.49.76.167', '44.49.76.168', '44.49.76.169', '44.49.76.170','44.49.76.171', '44.49.76.172', '44.49.76.173', '44.49.76.174']
-#ip_list = ["44.49.76.165", "44.49.76.173"]
+ip_list = ["192.168.1.211", "192.168.1.212", "192.168.1.213", "192.168.1.214", "192.168.1.215"]
 n_line = 3
 # 实现类
 trace = Track(n_line, ip_list)
-# trace.process()
 
 
 class Consumer(object):
@@ -36,23 +34,33 @@ class Consumer(object):
         """消费mq消息"""
         #try:
         credentials = pika.PlainCredentials(self.user, self.password)
-        s_conn = pika.BlockingConnection(
-        pika.ConnectionParameters(host=self.ip, port=self.port, virtual_host=self.vhost, credentials=credentials))
+        s_conn = pika.BlockingConnection(pika.ConnectionParameters(host=self.ip, port=self.port, virtual_host=self.vhost, credentials=credentials))
+
         channel = s_conn.channel()
+
         if cfg == "raw":
-           # print(cfg)
-           # print(self.user, self.password, self.ip, self.port, self.vhost, self.queue)
-            channel.queue_declare(queue=self.queue, durable=True, arguments={"x-message-ttl": 5000})
+            # channel.queue_declare(queue=self.queue, durable=True, arguments={"x-message-ttl": 60000})
+            # channel.basic_consume(queue=self.queue, on_message_callback=trace.ct_handle, auto_ack=True)
+            channel.exchange_declare(
+                # exchange="radar.vehicle.track.display.fanout",
+                exchange="radar.target.info.fanout",
+                exchange_type="fanout",
+            )
+
+            channel.queue_declare(queue=self.queue, exclusive=True)
+            channel.queue_bind(
+                # exchange="radar.vehicle.track.display.fanout",
+                exchange="radar.target.info.fanout",
+                queue=self.queue
+            )
             channel.basic_consume(queue=self.queue, on_message_callback=trace.ct_handle, auto_ack=True)
         else:
-           # print(cfg)
-           # print(self.user, self.password, self.ip, self.port, self.vhost, self.queue)
-            channel.queue_declare(queue=self.queue, durable=True, arguments={"x-message-ttl": 10000})
+
+            channel.queue_declare(queue=self.queue, durable=True, arguments={"x-message-ttl": 60000})
             channel.basic_consume(queue=self.queue, on_message_callback=trace.plate_handle, auto_ack=True)
 
         channel.start_consuming()
-        #except Exception as e:
-        #    print("receive_msg_mq error: ", e)
+
 
     def callback(self, ch, method, properties, body):
         data = json.loads(body)
